@@ -143,7 +143,7 @@ function element_order(a, star::Function)
         end
     end
 end
-function element_power(star::Function, elem, n::Int)
+function element_power(star::Function, elem::T, n::Int) where {T}
     result = elem
     for _ in 2:n
         result = star(result, elem)

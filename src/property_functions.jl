@@ -1,27 +1,58 @@
+function powerset_inplace(s::Vector{T}, n::Int, storage::Vector{T}) where {T}
+    offset = 0
+    itr = 1 
+    while n != 0
+        tz = trailing_zeros(n)
+        pos = offset + tz + 1 
+        if pos <= length(s)
+            storage[itr] = s[pos]
+        else
+            break
+        end
+        n >>= (tz+1)
+        offset += tz + 1 
+        itr += 1 
+    end
+end
 function find_subgroups(G::AbstractGroup)
-    order = length(G.elems)
-    possible_orders = divisors(order)
-    subgroups = []
-    for ord in possible_orders
-        ps = powerset(G.elems, ord, ord)
-        for set in ps
-            valid = true
-            if G.id ∉ set
-                continue
-            end
-            for elem in set
-                if !issetequal(G.binary_op.(Ref(elem), set), set) || G.id ∉ G.binary_op.(Ref(elem), set)
-                    valid = false
-                    break
+    sgs = Set([Set([G.id])])
+    powers = sort(unique([sum(collect(values(Dict(i for i in factor(num))))) for num in divisors(G.order)]))[2:end-1]
+    elem_orders = Dict(a => element_order(a, G.binary_op) for a in G.elems)
+    elem_storage = Vector{typeof(G.id)}(undef, 2)
+    subset_storage = Vector{typeof(G.id)}(undef, length(G.elems))
+    for pow in powers
+        # if !isempty(filter(i -> length(i)==G.order, sgs))
+        #     break
+        # end
+        gens = powerset(G.elems, pow, pow)
+        for s in gens
+            skip = false
+            for i in eachindex(s)
+                for j in i+1:length(s)-1
+                    if elem_orders[s[j]] == elem_orders[s[i]]
+                        continue
+                    end
+                    if max(elem_orders[s[j]],elem_orders[s[i]]) % min(elem_orders[s[j]],elem_orders[s[i]]) == 0
+                        elem_storage[1] = s[j]
+                        elem_storage[2] = s[i]
+                        sort!(elem_storage, by=(i -> elem_orders[i]))
+                        for n in 1:elem_orders[elem_storage[1]]
+                            if element_power(G.binary_op, elem_storage[1], n) == elem_storage[2]
+                                skip = true
+                                break
+                            end
+                        end
+                    end
                 end
             end
-            if !valid
+            if skip
                 continue
             end
-            push!(subgroups, set)
+            sg = Set(create_from_generators(ntuple(i -> s[i], length(s)), G.binary_op))
+            push!(sgs, sg)
         end
     end
-    G.cache.subgroups = [Group(sg, G.binary_op) for sg in subgroups]
+    G.cache.subgroups = [Group(collect(sg), G.binary_op) for sg in sgs]
     return G.cache.subgroups
 end
 
@@ -53,7 +84,7 @@ function dict_to_cycle(d::Dict)
     end
     return isempty(cycles) ? "()" : join(["(" * join(cycle, " ") * ")" for cycle in cycles], "")
 end
-function dict_to_cycle(dv::Vector{Dict})
+function dict_to_cycle(dv)
     new_dv = []
     for d in dv
         n = maximum(keys(d))
