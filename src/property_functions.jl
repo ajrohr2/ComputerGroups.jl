@@ -19,12 +19,8 @@ function find_subgroups(G::AbstractGroup)
     powers = sort(unique([sum(collect(values(Dict(i for i in factor(num))))) for num in divisors(G.order)]))[2:end-1]
     elem_orders = Dict(a => element_order(a, G.binary_op) for a in G.elems)
     elem_storage = Vector{typeof(G.id)}(undef, 2)
-    subset_storage = Vector{typeof(G.id)}(undef, length(G.elems))
     for pow in powers
-        # if !isempty(filter(i -> length(i)==G.order, sgs))
-        #     break
-        # end
-        gens = powerset(G.elems, pow, pow)
+        gens = combinations(G.elems, pow)
         for s in gens
             skip = false
             for i in eachindex(s)
@@ -43,7 +39,9 @@ function find_subgroups(G::AbstractGroup)
                             end
                         end
                     end
+                    skip && break
                 end
+                skip && break
             end
             if skip
                 continue
